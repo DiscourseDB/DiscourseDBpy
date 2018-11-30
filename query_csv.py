@@ -32,11 +32,11 @@ class DiscourseDB:
         """Limit interface to a particular database; or set to None to query across databases"""
         self.db = db
 
-    def _upload(self, endpoint, params=None, filename=None):
+    def _upload(self, endpoint, params={}, filename=None, fileparam="file"):
         assert filename is not None, "No upload file specified"
         basic = HTTPBasicAuth(self.user,self.password)
-        files = {'file': open(filename,"rb")}
-        return requests.post("%s/%s" % (self.service, endpoint), data = {}, auth=basic, verify=False, params=params, files=files, stream=True, headers={'Accept-Encoding': None}) 
+        files = {fileparam: open(filename,"rb")}
+        return requests.post("%s/%s" % (self.service, endpoint), data = {}, auth=basic, verify=False, params=params, files=files, stream=True, headers={'Accept-Encoding': 'gzip, deflate, br', "user": "cbogartdenver@gmail.com"}) 
         print("Posted")
 
     def _request(self, endpoint, params=None, parsejson = True):
@@ -92,7 +92,7 @@ class DiscourseDB:
     def upload_annotated(self, fromfile):
         """Upload the annotated file"""
         return self._upload("browsing/action/database/%s/uploadLightside" % (self.db.replace("discoursedb_ext_",""),),
-                       filename=fromfile)
+                       filename=fromfile, fileparam = "file_annotatedFileForUpload")
 
     def download_for_annotation(self, query, tofile):
         """Run the query and download to a file
@@ -103,13 +103,13 @@ class DiscourseDB:
 
         data = self._request("browsing/action/downloadLightsideQuery/for_annotation.csv", 
                        params={"query": json.dumps(query)}, parsejson=False)
-        outf = open(tofile, "ab")
+        outf = open(tofile, "wb")
         try:
             outf.write(data.encode("utf-8"))
         except Exception as e:
             print(e)
         try:
-            return len(list(csv.reader(data))) -1
+            return len(list(csv.reader(data.encode("utf-8")))) -1
         except Exception as e:
             print (e)
             return None
