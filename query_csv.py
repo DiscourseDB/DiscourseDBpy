@@ -32,6 +32,13 @@ class DiscourseDB:
         """Limit interface to a particular database; or set to None to query across databases"""
         self.db = db
 
+    def _upload(self, endpoint, params=None, filename=None):
+        assert filename is not None, "No upload file specified"
+        basic = HTTPBasicAuth(self.user,self.password)
+        files = {'file': open(filename,"rb")}
+        return requests.post("%s/%s" % (self.service, endpoint), data = {}, auth=basic, verify=False, params=params, files=files, stream=True, headers={'Accept-Encoding': None}) 
+        print("Posted")
+
     def _request(self, endpoint, params=None, parsejson = True):
         basic = HTTPBasicAuth(self.user,self.password)
         answer = requests.get("%s/%s" % (self.service, endpoint), auth=basic, verify=False, params=params)
@@ -82,6 +89,31 @@ class DiscourseDB:
            print("    Got",rc,"rows, for a total of", rowcount)
            append=True
 
+    def upload_annotated(self, fromfile):
+        """Upload the annotated file"""
+        return self._upload("browsing/action/database/%s/uploadLightside" % (self.db.replace("discoursedb_ext_",""),),
+                       filename=fromfile)
+
+    def download_for_annotation(self, query, tofile):
+        """Run the query and download to a file
+
+        May fail for very large queries, in which case use download_huge.
+        If append=True, omit the header line, and append rather than write
+        Return the number of rows retrieved"""
+
+        data = self._request("browsing/action/downloadLightsideQuery/for_annotation.csv", 
+                       params={"query": json.dumps(query)}, parsejson=False)
+        outf = open(tofile, "ab")
+        try:
+            outf.write(data.encode("utf-8"))
+        except Exception as e:
+            print(e)
+        try:
+            return len(list(csv.reader(data))) -1
+        except Exception as e:
+            print (e)
+            return None
+
     def download(self, query, tofile, append=False):
         """Run the query and download to a file
 
@@ -91,19 +123,20 @@ class DiscourseDB:
 
         data = self._request("browsing/action/downloadQueryCsvExpandible/discoursedb_data.csv", 
                        params={"query": json.dumps(query)}, parsejson=False)
-        outf = open(tofile, "ab")
         if append:
+            outf = open(tofile, "ab")
             try:
                 outf.write(("".join(data.split("\n",1)[-1:])).encode("utf-8"))
             except Exception as e:
                 print(e)
         else:
+            outf = open(tofile, "wb")
             try:
                 outf.write(data.encode("utf-8"))
             except Exception as e:
                 print(e)
         try:
-            return len(list(csv.reader(data))) -1
+            return len(list(csv.reader(data.encode("utf-8")))) -1
         except Exception as e:
             print (e)
             return None
